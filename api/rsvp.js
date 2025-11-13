@@ -6,19 +6,19 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
-  const pasangan = req.query.pasangan;
+  const couple = req.query.couple;
 
-  // CORS
+  // CORS setup
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  if (!pasangan) {
-    return res.status(400).json({ error: "Parameter ?pasangan= wajib diisi" });
+  if (!couple) {
+    return res.status(400).json({ error: "Parameter ?couple= wajib diisi" });
   }
 
-  // POST → Tambah RSVP baru
+  // POST → tambah RSVP baru
   if (req.method === "POST") {
     const { nama, ucapan, status } = req.body;
 
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     }
 
     try {
-      // Ambil data pasangan
+      // Ambil semua data
       const { data: coupleData, error: fetchError } = await supabase
         .from("couple")
         .select("data")
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       if (fetchError) throw fetchError;
 
       const currentData = coupleData?.data || {};
-      const pasanganData = currentData[pasangan] || {
+      const pasanganData = currentData[couple] || {
         bukutamu: [],
         rsvp: [],
         visitor: []
@@ -52,8 +52,9 @@ export default async function handler(req, res) {
         waktu: new Date().toISOString()
       });
 
-      // Simpan ke Supabase
-      const updatedData = { ...currentData, [pasangan]: pasanganData };
+      // Simpan kembali
+      const updatedData = { ...currentData, [couple]: pasanganData };
+
       const { error: updateError } = await supabase
         .from("couple")
         .update({ data: updatedData });
@@ -65,12 +66,12 @@ export default async function handler(req, res) {
         data: pasanganData
       });
     } catch (err) {
-      console.error(err);
+      console.error("❌ Error RSVP:", err);
       return res.status(500).json({ error: "Gagal menambahkan RSVP." });
     }
   }
 
-  // GET → Ambil semua RSVP
+  // GET → ambil semua RSVP untuk couple ini
   if (req.method === "GET") {
     try {
       const { data: coupleData, error } = await supabase
@@ -80,7 +81,7 @@ export default async function handler(req, res) {
 
       if (error) throw error;
 
-      const pasanganData = coupleData?.data?.[pasangan];
+      const pasanganData = coupleData?.data?.[couple];
       if (!pasanganData)
         return res.status(404).json({ error: "Data pasangan tidak ditemukan" });
 
@@ -88,7 +89,7 @@ export default async function handler(req, res) {
         rsvp: pasanganData.rsvp || []
       });
     } catch (err) {
-      console.error(err);
+      console.error("❌ Error GET RSVP:", err);
       return res.status(500).json({ error: "Gagal mengambil data RSVP." });
     }
   }
