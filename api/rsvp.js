@@ -18,75 +18,80 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Parameter ?pasangan= wajib diisi" });
   }
 
+  // POST → Tambah RSVP baru
   if (req.method === "POST") {
     const { nama, ucapan, status } = req.body;
 
     if (!nama || !status) {
-      return res.status(400).json({
-        error: "Field 'nama' dan 'status' wajib diisi.",
-      });
+      return res
+        .status(400)
+        .json({ error: "Field 'nama' dan 'status' wajib diisi." });
     }
 
     try {
       // Ambil data pasangan
-      const { data: pasanganData, error: fetchError } = await supabase
+      const { data: coupleData, error: fetchError } = await supabase
         .from("couple")
         .select("data")
-        .eq("pasangan", pasangan)
         .single();
 
-      if (fetchError || !pasanganData)
-        throw new Error("Data pasangan tidak ditemukan");
+      if (fetchError) throw fetchError;
 
-      const existingData = pasanganData.data || {
+      const currentData = coupleData?.data || {};
+      const pasanganData = currentData[pasangan] || {
         bukutamu: [],
         rsvp: [],
-        visitor: [],
+        visitor: []
       };
 
-      const newRsvp = {
+      // Tambahkan RSVP baru
+      pasanganData.rsvp.push({
         nama,
         ucapan: ucapan || "",
         status,
-        waktu: new Date().toISOString(),
-      };
+        waktu: new Date().toISOString()
+      });
 
-      const updatedRsvp = [...(existingData.rsvp || []), newRsvp];
-      const updatedData = { ...existingData, rsvp: updatedRsvp };
-
+      // Simpan ke Supabase
+      const updatedData = { ...currentData, [pasangan]: pasanganData };
       const { error: updateError } = await supabase
         .from("couple")
-        .update({ data: updatedData })
-        .eq("pasangan", pasangan);
+        .update({ data: updatedData });
 
       if (updateError) throw updateError;
 
       return res.status(200).json({
         message: "RSVP berhasil ditambahkan",
-        data: newRsvp,
+        data: pasanganData
       });
     } catch (err) {
       console.error(err);
-      return res.status(500).json({ error: "Gagal menambahkan RSVP" });
+      return res.status(500).json({ error: "Gagal menambahkan RSVP." });
     }
   }
 
+  // GET → Ambil semua RSVP
   if (req.method === "GET") {
-    // Ambil semua RSVP
-    const { data, error } = await supabase
-      .from("couple")
-      .select("data")
-      .eq("pasangan", pasangan)
-      .single();
+    try {
+      const { data: coupleData, error } = await supabase
+        .from("couple")
+        .select("data")
+        .single();
 
-    if (error || !data) {
-      return res.status(404).json({ error: "Pasangan tidak ditemukan" });
+      if (error) throw error;
+
+      const pasanganData = coupleData?.data?.[pasangan];
+      if (!pasanganData)
+        return res.status(404).json({ error: "Data pasangan tidak ditemukan" });
+
+      return res.status(200).json({
+        rsvp: pasanganData.rsvp || []
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Gagal mengambil data RSVP." });
     }
-
-    return res.status(200).json({
-      rsvp: data.data.rsvp || [],
-    });
   }
 
-  return res.status(405).json({ error: "Method tidak diizinkan" });
+  return res.status(405).json({ error: "Method tidak diizinkan." });
 }
