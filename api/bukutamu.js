@@ -11,7 +11,7 @@ export default async function handler(req, res) {
 
   // Ambil data JSON dari Supabase
   let { data: record, error } = await supabase
-    .from("undangan_data")
+    .from("data_langgeng")
     .select("data")
     .eq("couple", couple)
     .single();
