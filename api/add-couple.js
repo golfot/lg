@@ -30,7 +30,7 @@ export default async function handler(req, res) {
       };
 
       // Simpan ke Supabase
-      const { error } = await supabase.from("undangan_data").insert([
+      const { error } = await supabase.from("data_langgeng").insert([
         {
           pasangan,
           data: initialData[pasangan]
