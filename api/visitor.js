@@ -7,7 +7,7 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   const pasangan = req.query.pasangan;
-  const tamu = req.query.to; // ambil dari parameter ?to=arsi&andika
+  const namaTamu = req.query.to; // ambil dari ?to=
 
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -16,83 +16,88 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   if (!pasangan) {
-    return res.status(400).json({ error: "Parameter ?pasangan= wajib diisi" });
+    return res
+      .status(400)
+      .json({ error: "Parameter ?pasangan= wajib diisi, contoh: ?pasangan=andi-anggun" });
   }
 
   if (req.method === "POST") {
-    if (!tamu) {
-      return res.status(400).json({ error: "Parameter ?to= wajib diisi" });
+    if (!namaTamu) {
+      return res
+        .status(400)
+        .json({ error: "Parameter ?to=nama_tamu wajib diisi" });
     }
 
     try {
       // Ambil data pasangan
-      const { data: pasanganData, error: fetchError } = await supabase
+      const { data: coupleData, error: fetchError } = await supabase
         .from("couple")
         .select("data")
-        .eq("pasangan", pasangan)
         .single();
 
-      if (fetchError || !pasanganData)
-        throw new Error("Data pasangan tidak ditemukan");
+      if (fetchError) throw fetchError;
 
-      const existingData = pasanganData.data || {
+      const currentData = coupleData?.data || {};
+      const pasanganData = currentData[pasangan] || {
         bukutamu: [],
         rsvp: [],
-        visitor: [],
+        visitor: []
       };
 
-      // Jika visitor belum ada, tambahkan
-      const visitorList = existingData.visitor || [];
-
-      const sudahAda = visitorList.some(
-        (v) => v.nama.toLowerCase() === tamu.toLowerCase()
+      // Cek apakah tamu sudah tercatat
+      const sudahAda = pasanganData.visitor.some(
+        (v) => v.nama.toLowerCase() === namaTamu.toLowerCase()
       );
 
       if (!sudahAda) {
-        const newVisitor = {
-          nama: tamu,
-          waktu: new Date().toISOString(),
-        };
-
-        const updatedVisitor = [...visitorList, newVisitor];
-        const updatedData = { ...existingData, visitor: updatedVisitor };
-
-        // Simpan ke Supabase
-        const { error: updateError } = await supabase
-          .from("couple")
-          .update({ data: updatedData })
-          .eq("pasangan", pasangan);
-
-        if (updateError) throw updateError;
-
-        return res.status(200).json({
-          message: "Visitor baru dicatat",
-          data: updatedVisitor,
-        });
-      } else {
-        return res.status(200).json({
-          message: "Visitor sudah pernah tercatat",
-          data: visitorList,
+        pasanganData.visitor.push({
+          nama: namaTamu,
+          waktu: new Date().toISOString()
         });
       }
+
+      // Simpan ke Supabase
+      const updatedData = { ...currentData, [pasangan]: pasanganData };
+      const { error: updateError } = await supabase
+        .from("couple")
+        .update({ data: updatedData });
+
+      if (updateError) throw updateError;
+
+      return res.status(200).json({
+        message: sudahAda
+          ? "Tamu sudah pernah tercatat, tidak ditambahkan lagi."
+          : "Visitor baru berhasil ditambahkan.",
+        data: pasanganData
+      });
     } catch (err) {
       console.error(err);
-      return res.status(500).json({ error: "Gagal mencatat visitor" });
+      return res.status(500).json({ error: "Gagal memperbarui visitor." });
     }
-  } else if (req.method === "GET") {
-    // GET semua visitor
-    const { data, error } = await supabase
-      .from("couple")
-      .select("data")
-      .eq("pasangan", pasangan)
-      .single();
-
-    if (error || !data) {
-      return res.status(404).json({ error: "Pasangan tidak ditemukan" });
-    }
-
-    return res.status(200).json({ visitor: data.data.visitor || [] });
-  } else {
-    return res.status(405).json({ error: "Method tidak diizinkan" });
   }
+
+  // GET → Ambil semua visitor
+  if (req.method === "GET") {
+    try {
+      const { data: coupleData, error } = await supabase
+        .from("couple")
+        .select("data")
+        .single();
+
+      if (error) throw error;
+
+      const pasanganData = coupleData?.data?.[pasangan];
+      if (!pasanganData)
+        return res.status(404).json({ error: "Data pasangan tidak ditemukan" });
+
+      return res.status(200).json({
+        visitor: pasanganData.visitor || []
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Gagal mengambil data visitor." });
+    }
+  }
+
+  return res.status(405).json({ error: "Method tidak diizinkan." });
 }
