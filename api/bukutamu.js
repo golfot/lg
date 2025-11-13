@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       waktu: new Date().toISOString(),
     });
 
-    await supabase.from("undangan_data").upsert({ couple, data: db });
+    await supabase.from("data_langgeng").upsert({ couple, data: db });
     return res.status(200).json({ message: "Buku tamu ditambah", data: db });
   }
 
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
 
     db.bukutamu = db.bukutamu.filter((t) => t.nama !== nama);
 
-    await supabase.from("undangan_data").upsert({ couple, data: db });
+    await supabase.from("data_langgeng").upsert({ couple, data: db });
     return res.status(200).json({ message: "Buku tamu dihapus", data: db });
   }
 
