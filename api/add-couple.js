@@ -1,12 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
 export default async function handler(req, res) {
-  const couple = req.query.couple; // ganti dari ?pasangan= ke ?couple=
+  const couple = req.query.couple;
 
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -14,34 +11,22 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  if (!couple) {
-    return res.status(400).json({ error: "Parameter ?couple= wajib diisi" });
-  }
+  if (!couple) return res.status(400).json({ error: "Parameter ?couple= wajib diisi" });
 
   if (req.method === "POST") {
     try {
-      // Struktur awal
-      const initialData = {
-        rsvp: [],
-        visitor: [],
-        bukutamu: []
-      };
+      const initialData = { rsvp: [], visitor: 0, bukutamu: [] };
 
-      // Simpan ke Supabase
-      const { error } = await supabase.from("data_langgeng").insert([
+      const { error } = await supabase.from("data_langgeng").upsert([
         {
-          couple, // kolom di tabel kamu
+          couple,
           data: initialData
         }
       ]);
 
       if (error) throw error;
 
-      return res.status(200).json({
-        success: true,
-        message: `Pasangan '${couple}' berhasil dibuat.`,
-        data: initialData
-      });
+      return res.status(200).json({ success: true, message: `Pasangan '${couple}' berhasil dibuat.` });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: "Gagal membuat pasangan baru." });
