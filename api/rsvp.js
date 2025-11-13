@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (!couple) return res.status(400).json({ error: "Harus ada nama pasangan" });
 
   let { data: record, error } = await supabase
-    .from("undangan_data")
+    .from("data_langgeng")
     .select("data")
     .eq("couple", couple)
     .single();
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       waktu: new Date().toISOString(),
     });
 
-    await supabase.from("undangan_data").upsert({ couple, data: db });
+    await supabase.from("data_langgeng").upsert({ couple, data: db });
     return res.status(200).json({ message: "RSVP ditambah", data: db });
   }
 
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
 
     db.rsvp = db.rsvp.filter((t) => t.nama !== nama);
 
-    await supabase.from("undangan_data").upsert({ couple, data: db });
+    await supabase.from("data_langgeng").upsert({ couple, data: db });
     return res.status(200).json({ message: "RSVP dihapus", data: db });
   }
 
