@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (!couple) return res.status(400).json({ error: "Harus ada nama pasangan" });
 
   let { data: record, error } = await supabase
-    .from("undangan_data")
+    .from("data_langgeng")
     .select("data")
     .eq("couple", couple)
     .single();
@@ -30,13 +30,13 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     db.visitor = (db.visitor || 0) + 1;
-    await supabase.from("undangan_data").upsert({ couple, data: db });
+    await supabase.from("data_langgeng").upsert({ couple, data: db });
     return res.status(200).json({ message: "Visitor +1", total: db.visitor });
   }
 
   if (req.method === "DELETE") {
     db.visitor = 0;
-    await supabase.from("undangan_data").upsert({ couple, data: db });
+    await supabase.from("data_langgeng").upsert({ couple, data: db });
     return res.status(200).json({ message: "Visitor direset", total: 0 });
   }
 
