@@ -1,60 +1,63 @@
 import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
 export default async function handler(req, res) {
-  const couple = req.query.couple || Object.keys(req.query)[0];
-  if (!couple) return res.status(400).json({ error: "Harus ada nama pasangan" });
+  const couple = req.query.couple;
 
-  // Ambil data JSON dari Supabase
-  let { data: record, error } = await supabase
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+
+  if (!couple) return res.status(400).json({ error: "Parameter ?couple= wajib diisi" });
+
+  // Ambil data pasangan
+  const { data: row, error: fetchError } = await supabase
     .from("data_langgeng")
     .select("data")
     .eq("couple", couple)
     .single();
 
-  if (error && error.code !== "PGRST116") {
-    return res.status(500).json({ error: error.message });
-  }
+  if (fetchError) return res.status(404).json({ error: "Pasangan tidak ditemukan" });
+  const existingData = row?.data || { rsvp: [], visitor: 0, bukutamu: [] };
 
-  let db = record?.data || {
-    bukutamu: [],
-    rsvp: [],
-    visitor: 0,
-  };
-
-  // ==== GET ====
-  if (req.method === "GET") return res.status(200).json(db.bukutamu);
-
-  // ==== POST ====
+  // POST - Tambah buku tamu
   if (req.method === "POST") {
-    const body = req.body;
-    if (!body?.nama || !body?.pesan)
-      return res.status(400).json({ error: "nama & pesan wajib diisi" });
+    const { nama, pesan } = req.body;
+    if (!nama || !pesan)
+      return res.status(400).json({ error: "Nama dan pesan wajib diisi" });
 
-    db.bukutamu.push({
-      nama: body.nama,
-      pesan: body.pesan,
-      waktu: new Date().toISOString(),
-    });
+    existingData.bukutamu.push({ nama, pesan, waktu: new Date().toISOString() });
 
-    await supabase.from("data_langgeng").upsert({ couple, data: db });
-    return res.status(200).json({ message: "Buku tamu ditambah", data: db });
+    const { error: updateError } = await supabase
+      .from("data_langgeng")
+      .update({ data: existingData })
+      .eq("couple", couple);
+
+    if (updateError) return res.status(500).json({ error: "Gagal menambah buku tamu" });
+    return res.status(200).json({ message: "Buku tamu ditambah", data: existingData });
   }
 
-  // ==== DELETE ====
+  // DELETE - Hapus buku tamu berdasarkan nama
   if (req.method === "DELETE") {
-    const nama = req.query.nama;
-    if (!nama) return res.status(400).json({ error: "nama wajib diisi" });
+    const { nama } = req.body;
+    if (!nama) return res.status(400).json({ error: "Nama wajib diisi untuk hapus" });
 
-    db.bukutamu = db.bukutamu.filter((t) => t.nama !== nama);
+    existingData.bukutamu = existingData.bukutamu.filter((t) => t.nama !== nama);
 
-    await supabase.from("data_langgeng").upsert({ couple, data: db });
-    return res.status(200).json({ message: "Buku tamu dihapus", data: db });
+    const { error: delError } = await supabase
+      .from("data_langgeng")
+      .update({ data: existingData })
+      .eq("couple", couple);
+
+    if (delError) return res.status(500).json({ error: "Gagal menghapus buku tamu" });
+    return res.status(200).json({ message: "Buku tamu dihapus", data: existingData });
   }
 
-  res.status(405).json({ error: "Method tidak didukung" });
+  // GET - Lihat semua
+  if (req.method === "GET") {
+    return res.status(200).json(existingData.bukutamu);
+  }
+
+  return res.status(405).json({ error: "Method tidak diizinkan" });
 }
