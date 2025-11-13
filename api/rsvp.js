@@ -18,7 +18,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Parameter ?couple= wajib diisi" });
   }
 
-  // POST → tambah RSVP baru
   if (req.method === "POST") {
     const { nama, ucapan, status } = req.body;
 
@@ -29,15 +28,27 @@ export default async function handler(req, res) {
     }
 
     try {
-      // Ambil semua data
-      const { data: coupleData, error: fetchError } = await supabase
+      // Ambil 1 baris data (kalau tidak ada, kita buat nanti)
+      let { data: coupleRow, error: fetchError } = await supabase
         .from("couple")
-        .select("data")
+        .select("id, data")
+        .limit(1)
         .single();
 
-      if (fetchError) throw fetchError;
+      // Jika tabel masih kosong, buat baris baru
+      if (fetchError && fetchError.code === "PGRST116") {
+        const { data: newRow, error: insertError } = await supabase
+          .from("couple")
+          .insert([{ data: {} }])
+          .select()
+          .single();
+        if (insertError) throw insertError;
+        coupleRow = newRow;
+      } else if (fetchError) {
+        throw fetchError;
+      }
 
-      const currentData = coupleData?.data || {};
+      const currentData = coupleRow?.data || {};
       const pasanganData = currentData[couple] || {
         bukutamu: [],
         rsvp: [],
@@ -57,7 +68,8 @@ export default async function handler(req, res) {
 
       const { error: updateError } = await supabase
         .from("couple")
-        .update({ data: updatedData });
+        .update({ data: updatedData })
+        .eq("id", coupleRow.id);
 
       if (updateError) throw updateError;
 
@@ -71,17 +83,16 @@ export default async function handler(req, res) {
     }
   }
 
-  // GET → ambil semua RSVP untuk couple ini
   if (req.method === "GET") {
     try {
-      const { data: coupleData, error } = await supabase
+      const { data: coupleRow, error } = await supabase
         .from("couple")
         .select("data")
         .single();
 
       if (error) throw error;
 
-      const pasanganData = coupleData?.data?.[couple];
+      const pasanganData = coupleRow?.data?.[couple];
       if (!pasanganData)
         return res.status(404).json({ error: "Data pasangan tidak ditemukan" });
 
